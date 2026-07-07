@@ -90,12 +90,14 @@ class GameImport(BaseModel):
     date: str
     time: str
     location: str
+    game_type: str = "League"
 
 class GameEdit(BaseModel):
     game_id: int
     date: str
     time: str
     location: str
+    game_type: str = "League"
 
 class ImportGamesRequest(BaseModel):
     games: list[GameImport]
@@ -108,6 +110,9 @@ class ReportScoreRequest(BaseModel):
 class MassRainoutRequest(BaseModel):
     location: str
     date: str = None
+
+class AutoAssignRequest(BaseModel):
+    target_type: str = "All"
 
 async def get_agent_response(msg: str) -> str:
     global global_chat
@@ -208,9 +213,9 @@ def import_games(req: ImportGamesRequest):
     for g in req.games:
         try:
             database.execute_write('''
-                INSERT INTO games (date, time, location, status) 
-                VALUES (?, ?, ?, 'Scheduled')
-            ''', (g.date, g.time, g.location))
+                INSERT INTO games (date, time, location, status, game_type) 
+                VALUES (?, ?, ?, 'Scheduled', ?)
+            ''', (g.date, g.time, g.location, g.game_type))
             inserted_count += 1
         except Exception as e:
             errors.append(f"Failed to import game at {g.location}: {str(e)}")
@@ -221,9 +226,9 @@ def import_games(req: ImportGamesRequest):
 def add_game(g: GameImport):
     try:
         database.execute_write('''
-            INSERT INTO games (date, time, location, status) 
-            VALUES (?, ?, ?, 'Scheduled')
-        ''', (g.date, g.time, g.location))
+            INSERT INTO games (date, time, location, status, game_type) 
+            VALUES (?, ?, ?, 'Scheduled', ?)
+        ''', (g.date, g.time, g.location, g.game_type))
         return {"success": True}
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -233,9 +238,9 @@ def edit_game(g: GameEdit):
     try:
         database.execute_write('''
             UPDATE games 
-            SET date = ?, time = ?, location = ?
+            SET date = ?, time = ?, location = ?, game_type = ?
             WHERE game_id = ?
-        ''', (g.date, g.time, g.location, g.game_id))
+        ''', (g.date, g.time, g.location, g.game_type, g.game_id))
         return {"success": True}
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -255,11 +260,17 @@ def mass_rainout(req: MassRainoutRequest):
     return {"success": True, "updated": updated}
 
 @app.post("/api/auto_assign")
-def auto_assign():
+def auto_assign(req: AutoAssignRequest):
     # Option A: Distribute evenly
-    unassigned_games = database.execute_query("SELECT * FROM games WHERE umpire_id IS NULL AND status = 'Scheduled'")
+    query = "SELECT * FROM games WHERE umpire_id IS NULL AND status = 'Scheduled'"
+    params = []
+    if req.target_type != "All":
+        query += " AND game_type = ?"
+        params.append(req.target_type)
+        
+    unassigned_games = database.execute_query(query, tuple(params))
     if not unassigned_games:
-        return {"success": True, "message": "No unassigned games."}
+        return {"success": True, "message": f"No unassigned {req.target_type} games."}
         
     all_umpires = database.execute_query("SELECT * FROM umpires WHERE available = 1")
     if not all_umpires:

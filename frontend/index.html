@@ -430,7 +430,7 @@
 
             const [showAddGameModal, setShowAddGameModal] = React.useState(false);
             const [newGame, setNewGame] = React.useState({
-                date: '', time: '', location: ''
+                date: '', time: '', location: '', game_type: 'League'
             });
 
             const [showEditGameModal, setShowEditGameModal] = React.useState(false);
@@ -878,7 +878,16 @@
                                         </button>
                                         <button 
                                             onClick={async () => {
-                                                const res = await fetch("/api/auto_assign", { method: "POST" });
+                                                const target = prompt("Which games do you want to auto-assign? Type 'League', 'Tournament', or 'All'", "All");
+                                                if (!target || !['League', 'Tournament', 'All'].includes(target)) {
+                                                    alert("Invalid choice. Auto-assign cancelled.");
+                                                    return;
+                                                }
+                                                const res = await fetch("/api/auto_assign", { 
+                                                    method: "POST", 
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ target_type: target })
+                                                });
                                                 const data = await res.json();
                                                 if (data.success) {
                                                     alert(data.message);
@@ -939,6 +948,9 @@
                                                             <div className="flex items-center">
                                                                 <svg className="w-4 h-4 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                                                 {g.location}
+                                                            </div>
+                                                            <div className="text-xs mt-1 text-slate-400">
+                                                                {g.game_type === 'Tournament' ? '🏆 Tournament' : '⚾ League'}
                                                             </div>
                                                         </td>
                                                         <td className="py-4">
@@ -1340,6 +1352,13 @@
                                             <input type="time" required value={newGame.time} onChange={e => setNewGame({...newGame, time: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
                                         </div>
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Game Type</label>
+                                        <select value={newGame.game_type || 'League'} onChange={e => setNewGame({...newGame, game_type: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none">
+                                            <option value="League">⚾ League Game</option>
+                                            <option value="Tournament">🏆 Tournament Game</option>
+                                        </select>
+                                    </div>
                                     <button type="submit" className="w-full btn-gradient py-3 rounded-lg text-white font-bold mt-4">Save Game</button>
                                 </form>
                             </div>
@@ -1370,6 +1389,13 @@
                                             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Time</label>
                                             <input type="time" required value={editingGame.time} onChange={e => setEditingGame({...editingGame, time: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Game Type</label>
+                                        <select value={editingGame.game_type || 'League'} onChange={e => setEditingGame({...editingGame, game_type: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none">
+                                            <option value="League">⚾ League Game</option>
+                                            <option value="Tournament">🏆 Tournament Game</option>
+                                        </select>
                                     </div>
                                     <button type="submit" className="w-full btn-gradient py-3 rounded-lg text-white font-bold mt-4">Save Changes</button>
                                 </form>
