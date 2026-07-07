@@ -156,6 +156,18 @@ def import_roster(req: ImportRosterRequest):
             
     return {"success": len(errors) == 0, "inserted": inserted_count, "errors": errors}
 
+@app.post("/api/add_umpire")
+def add_umpire(u: UmpireImport):
+    default_pw = database.hash_password("umpire123")
+    try:
+        database.execute_write('''
+            INSERT INTO umpires (name, phone_number, password_hash, available, level, pay_rate, registration_expiry, background_check_expiry) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (u.name, u.phone_number, default_pw, True, u.level, u.pay_rate, u.registration_expiry, u.background_check_expiry))
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
 @app.post("/api/import_games")
 def import_games(req: ImportGamesRequest):
     inserted_count = 0
