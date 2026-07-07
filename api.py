@@ -72,6 +72,15 @@ class UmpireImport(BaseModel):
     registration_expiry: str
     background_check_expiry: str
 
+class UmpireEdit(BaseModel):
+    id: int
+    name: str
+    phone_number: str
+    level: str
+    pay_rate: float
+    registration_expiry: str
+    background_check_expiry: str
+
 class ImportRosterRequest(BaseModel):
     umpires: list[UmpireImport]
 
@@ -167,6 +176,18 @@ def add_umpire(u: UmpireImport):
             INSERT INTO umpires (name, phone_number, password_hash, available, level, pay_rate, registration_expiry, background_check_expiry) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (u.name, u.phone_number, default_pw, True, u.level, u.pay_rate, u.registration_expiry, u.background_check_expiry))
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.post("/api/edit_umpire")
+def edit_umpire(u: UmpireEdit):
+    try:
+        database.execute_write('''
+            UPDATE umpires 
+            SET name = ?, phone_number = ?, level = ?, pay_rate = ?, registration_expiry = ?, background_check_expiry = ?
+            WHERE id = ?
+        ''', (u.name, u.phone_number, u.level, u.pay_rate, u.registration_expiry, u.background_check_expiry, u.id))
         return {"success": True}
     except Exception as e:
         return {"success": False, "message": str(e)}
