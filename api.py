@@ -89,6 +89,12 @@ class GameImport(BaseModel):
     time: str
     location: str
 
+class GameEdit(BaseModel):
+    game_id: int
+    date: str
+    time: str
+    location: str
+
 class ImportGamesRequest(BaseModel):
     games: list[GameImport]
 
@@ -208,6 +214,29 @@ def import_games(req: ImportGamesRequest):
             errors.append(f"Failed to import game at {g.location}: {str(e)}")
             
     return {"success": len(errors) == 0, "inserted": inserted_count, "errors": errors}
+
+@app.post("/api/add_game")
+def add_game(g: GameImport):
+    try:
+        database.execute_write('''
+            INSERT INTO games (date, time, location, status) 
+            VALUES (?, ?, ?, 'Scheduled')
+        ''', (g.date, g.time, g.location))
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.post("/api/edit_game")
+def edit_game(g: GameEdit):
+    try:
+        database.execute_write('''
+            UPDATE games 
+            SET date = ?, time = ?, location = ?
+            WHERE game_id = ?
+        ''', (g.date, g.time, g.location, g.game_id))
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
 @app.post("/api/report_score")
 def report_score(req: ReportScoreRequest):
