@@ -11,6 +11,9 @@ global_chat = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize the database on startup (crucial for cloud deployments like Render)
+    database.init_db()
+    
     global global_chat
     from tools import get_unassigned_games, get_available_umpires, assign_umpire_to_game, reassign_umpire_to_game, check_credentials, send_sms_to_umpire
     
