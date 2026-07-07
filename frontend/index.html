@@ -13,6 +13,8 @@
     <!-- jsPDF for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Modern Typography: Outfit & Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -195,6 +197,7 @@
         function UmpirePortal({ user }) {
             const [games, setGames] = useState([]);
             const [available, setAvailable] = useState(true);
+            const [myUmpireData, setMyUmpireData] = useState(null);
 
             const fetchData = async () => {
                 const [gamesRes, umpiresRes] = await Promise.all([
@@ -206,7 +209,10 @@
                 
                 setGames(gData.filter(g => g.umpire_id === user.id));
                 const me = uData.find(u => u.id === user.id);
-                if (me) setAvailable(me.available);
+                if (me) {
+                    setAvailable(me.available);
+                    setMyUmpireData(me);
+                }
             };
 
             useEffect(() => {
@@ -254,6 +260,23 @@
                             {available ? '🟢 I AM AVAILABLE' : '🔴 I AM UNAVAILABLE'}
                         </button>
                     </div>
+
+                    {myUmpireData && (
+                        <div className="glass p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-t-4 border-emerald-500">
+                            <div>
+                                <h3 className="brand text-2xl font-bold text-white">Personal Earnings</h3>
+                                <p className="text-slate-400 text-sm mt-1">Total payout for completed games.</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-4xl font-bold text-emerald-400">
+                                    ${(games.filter(g => g.status === 'Completed').length * myUmpireData.pay_rate).toFixed(2)}
+                                </div>
+                                <div className="text-slate-400 text-sm mt-1">
+                                    {games.filter(g => g.status === 'Completed').length} completed games @ ${myUmpireData.pay_rate}/game
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="glass p-8">
                         <h3 className="brand text-2xl font-bold mb-6 text-white">Your Upcoming Schedule</h3>
@@ -317,6 +340,68 @@
             const [gameCsvText, setGameCsvText] = React.useState("");
             const [importing, setImporting] = React.useState(false);
             const [gameImporting, setGameImporting] = React.useState(false);
+            const chartInstances = useRef({});
+
+            useEffect(() => {
+                if (activeTab === 'analytics' && games.length > 0) {
+                    const renderCharts = () => {
+                        // Game Status Pie Chart
+                        const pieCtx = document.getElementById('statusPieChart');
+                        if (pieCtx) {
+                            if (chartInstances.current.pie) chartInstances.current.pie.destroy();
+                            const statuses = games.reduce((acc, g) => {
+                                acc[g.status] = (acc[g.status] || 0) + 1;
+                                return acc;
+                            }, {});
+                            chartInstances.current.pie = new window.Chart(pieCtx, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: Object.keys(statuses),
+                                    datasets: [{
+                                        data: Object.values(statuses),
+                                        backgroundColor: ['#3b82f6', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6'],
+                                        borderWidth: 0
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', padding: 20 } } }
+                                }
+                            });
+                        }
+                        
+                        // Top Earners Bar Chart
+                        const barCtx = document.getElementById('earnersBarChart');
+                        if (barCtx && payrollData.length > 0) {
+                            if (chartInstances.current.bar) chartInstances.current.bar.destroy();
+                            const topEarners = [...payrollData].sort((a, b) => b.totalPayout - a.totalPayout).slice(0, 5);
+                            chartInstances.current.bar = new window.Chart(barCtx, {
+                                type: 'bar',
+                                data: {
+                                    labels: topEarners.map(e => e.umpire.name),
+                                    datasets: [{
+                                        label: 'Payout ($)',
+                                        data: topEarners.map(e => e.totalPayout),
+                                        backgroundColor: '#10b981',
+                                        borderRadius: 4
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { display: false } },
+                                    scales: {
+                                        y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                                    }
+                                }
+                            });
+                        }
+                    };
+                    setTimeout(renderCharts, 100);
+                }
+            }, [activeTab, games, payrollData]);
             
             const [showAddUmpireModal, setShowAddUmpireModal] = React.useState(false);
             const [newUmpire, setNewUmpire] = React.useState({
@@ -736,6 +821,7 @@
                             <button onClick={() => setActiveTab('schedule')} className={`flex-1 py-3 rounded-xl font-semibold transition ${activeTab === 'schedule' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>Live Schedule</button>
                             <button onClick={() => setActiveTab('roster')} className={`flex-1 py-3 rounded-xl font-semibold transition ${activeTab === 'roster' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>Roster & Import</button>
                             <button onClick={() => setActiveTab('payroll')} className={`flex-1 py-3 rounded-xl font-semibold transition ${activeTab === 'payroll' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-400 hover:text-emerald-300 hover:bg-emerald-500/10'}`}>💰 Payroll</button>
+                            <button onClick={() => setActiveTab('analytics')} className={`flex-1 py-3 rounded-xl font-semibold transition ${activeTab === 'analytics' ? 'bg-purple-500/20 text-purple-300' : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10'}`}>📊 Analytics</button>
                         </div>
 
                         {/* SCHEDULE TAB */}
@@ -1009,6 +1095,35 @@
                                                 </div>
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Analytics Tab */}
+                        {activeTab === 'analytics' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="glass p-8 flex justify-between items-center">
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-white flex items-center">
+                                            <span className="mr-3">📊</span> League Analytics
+                                        </h2>
+                                        <p className="text-slate-400 text-sm mt-1">Visualize your season data at a glance.</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="glass p-6">
+                                        <h3 className="text-lg font-bold text-white mb-6">Game Status Distribution</h3>
+                                        <div className="relative h-64">
+                                            <canvas id="statusPieChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div className="glass p-6">
+                                        <h3 className="text-lg font-bold text-white mb-6">Top 5 Earners</h3>
+                                        <div className="relative h-64">
+                                            <canvas id="earnersBarChart"></canvas>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
