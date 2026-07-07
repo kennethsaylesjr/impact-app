@@ -80,6 +80,8 @@ class UmpireEdit(BaseModel):
     pay_rate: float
     registration_expiry: str
     background_check_expiry: str
+    rating: int = 0
+    notes: str = ""
 
 class ImportRosterRequest(BaseModel):
     umpires: list[UmpireImport]
@@ -191,9 +193,9 @@ def edit_umpire(u: UmpireEdit):
     try:
         database.execute_write('''
             UPDATE umpires 
-            SET name = ?, phone_number = ?, level = ?, pay_rate = ?, registration_expiry = ?, background_check_expiry = ?
+            SET name = ?, phone_number = ?, level = ?, pay_rate = ?, registration_expiry = ?, background_check_expiry = ?, rating = ?, notes = ?
             WHERE id = ?
-        ''', (u.name, u.phone_number, u.level, u.pay_rate, u.registration_expiry, u.background_check_expiry, u.id))
+        ''', (u.name, u.phone_number, u.level, u.pay_rate, u.registration_expiry, u.background_check_expiry, u.rating, u.notes, u.id))
         return {"success": True}
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -251,6 +253,43 @@ def mass_rainout(req: MassRainoutRequest):
         (req.location, req.date)
     )
     return {"success": True, "updated": updated}
+
+@app.post("/api/auto_assign")
+def auto_assign():
+    # Option A: Distribute evenly
+    unassigned_games = database.execute_query("SELECT * FROM games WHERE umpire_id IS NULL AND status = 'Scheduled'")
+    if not unassigned_games:
+        return {"success": True, "message": "No unassigned games."}
+        
+    all_umpires = database.execute_query("SELECT * FROM umpires WHERE available = 1")
+    if not all_umpires:
+        return {"success": False, "message": "No umpires are available."}
+        
+    all_games = database.execute_query("SELECT * FROM games WHERE umpire_id IS NOT NULL")
+    
+    assigned_count = 0
+    for game in unassigned_games:
+        # Find umpires who are NOT already assigned to a game on the exact same date and time
+        available_for_game = []
+        for ump in all_umpires:
+            conflict = any(g['umpire_id'] == ump['id'] and g['date'] == game['date'] and g['time'] == game['time'] for g in all_games)
+            if not conflict:
+                available_for_game.append(ump)
+                
+        if available_for_game:
+            # Sort by who has the least games assigned overall to distribute evenly
+            available_for_game.sort(key=lambda u: sum(1 for g in all_games if g['umpire_id'] == u['id']))
+            selected_umpire = available_for_game[0]
+            
+            database.execute_write("UPDATE games SET umpire_id = ? WHERE game_id = ?", (selected_umpire['id'], game['game_id']))
+            # Add to all_games so they are considered busy for subsequent iterations
+            new_assigned_game = dict(game)
+            new_assigned_game['umpire_id'] = selected_umpire['id']
+            all_games.append(new_assigned_game)
+            assigned_count += 1
+            
+    return {"success": True, "message": f"Automatically assigned {assigned_count} games."}
+
 
 # Serve static frontend
 app.mount("/static", StaticFiles(directory="frontend"), name="static")

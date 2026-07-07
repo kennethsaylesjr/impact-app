@@ -30,7 +30,9 @@ def init_db():
             level TEXT NOT NULL,
             pay_rate REAL NOT NULL,
             registration_expiry TEXT NOT NULL,
-            background_check_expiry TEXT NOT NULL
+            background_check_expiry TEXT NOT NULL,
+            rating INTEGER DEFAULT 0,
+            notes TEXT DEFAULT ''
         )
     ''')
 
@@ -48,16 +50,27 @@ def init_db():
         )
     ''')
 
+    # Migrations
+    try:
+        cursor.execute("ALTER TABLE umpires ADD COLUMN rating INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE umpires ADD COLUMN notes TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+
+
     # Seed data if empty
     cursor.execute("SELECT COUNT(*) FROM umpires")
     if cursor.fetchone()[0] == 0:
         default_pw = hash_password("umpire123")
         cursor.executemany('''
-            INSERT INTO umpires (name, phone_number, password_hash, available, level, pay_rate, registration_expiry, background_check_expiry) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO umpires (name, phone_number, password_hash, available, level, pay_rate, registration_expiry, background_check_expiry, rating, notes) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', [
-            ("John Doe", "+15551234567", default_pw, True, "Senior", 65.0, "2027-01-01", "2027-05-15"), 
-            ("Jane Smith", "+15559876543", default_pw, True, "Junior", 45.0, "2030-01-01", "2030-12-01"), 
+            ("John Doe", "+15551234567", default_pw, True, "Senior", 65.0, "2027-01-01", "2027-05-15", 5, "Great umpire."), 
+            ("Jane Smith", "+15559876543", default_pw, True, "Junior", 45.0, "2030-01-01", "2030-12-01", 4, ""), 
             ("Bob Johnson", "+15555555555", default_pw, False, "Senior", 65.0, "2027-01-01", "2027-06-01") 
         ])
 

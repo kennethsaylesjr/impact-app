@@ -311,9 +311,26 @@
                                                 {g.score && <div className="text-white text-sm font-bold">{g.score}</div>}
                                             </div>
                                         </div>
+                                        <div className="flex space-x-2 mt-4">
+                                            <a 
+                                                href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=Umpiring+Game&dates=${new Date(`${g.date}T${g.time}`).toISOString().replace(/-|:|\.\d\d\d/g,"")}/${new Date(new Date(`${g.date}T${g.time}`).getTime() + 7200000).toISOString().replace(/-|:|\.\d\d\d/g,"")}&details=Umpiring+Assignment&location=${encodeURIComponent(g.location)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-1/2 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded text-xs font-bold transition flex items-center justify-center text-center"
+                                            >
+                                                Google Cal
+                                            </a>
+                                            <a 
+                                                href={`data:text/calendar;charset=utf8,${encodeURIComponent("BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:" + new Date(`${g.date}T${g.time}`).toISOString().replace(/-|:|\.\d\d\d/g,"") + "\nDTEND:" + new Date(new Date(`${g.date}T${g.time}`).getTime() + 7200000).toISOString().replace(/-|:|\.\d\d\d/g,"") + "\nSUMMARY:Umpiring Game\nLOCATION:" + g.location + "\nEND:VEVENT\nEND:VCALENDAR")}`}
+                                                download={`Game_${g.game_id}.ics`}
+                                                className="w-1/2 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 rounded text-xs font-bold transition flex items-center justify-center text-center"
+                                            >
+                                                Apple Cal
+                                            </a>
+                                        </div>
                                         <button 
                                             onClick={() => handleReportScore(g.game_id, g.status, g.score)}
-                                            className="w-full mt-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded text-sm transition"
+                                            className="w-full mt-2 py-2 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded text-sm transition"
                                         >
                                             Update Status / Score
                                         </button>
@@ -859,6 +876,21 @@
                                             <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                                             Add Game
                                         </button>
+                                        <button 
+                                            onClick={async () => {
+                                                const res = await fetch("/api/auto_assign", { method: "POST" });
+                                                const data = await res.json();
+                                                if (data.success) {
+                                                    alert(data.message);
+                                                    fetchData(); // Refresh games
+                                                } else {
+                                                    alert("Failed to auto-assign: " + data.message);
+                                                }
+                                            }}
+                                            className="px-4 py-2 bg-purple-500/10 text-purple-400 text-sm rounded-lg font-bold border border-purple-500/20 hover:bg-purple-500/20 transition flex items-center"
+                                        >
+                                            ⚡ Auto-Assign
+                                        </button>
                                         <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs rounded-full font-medium border border-emerald-500/20 hidden lg:inline-block">Auto-syncing</span>
                                     </div>
                                 </div>
@@ -1016,7 +1048,10 @@
                                                                 <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 border-2 border-[#1e1b4b] rounded-full ${u.available ? 'bg-emerald-400' : 'bg-rose-400'}`}></div>
                                                             </div>
                                                             <div>
-                                                                <div className="font-bold text-white">{u.name}</div>
+                                                                <div className="font-bold text-white flex items-center">
+                                                                    {u.name}
+                                                                    {u.rating > 0 && <span className="ml-2 text-yellow-400 text-xs" title={u.notes}>{'★'.repeat(u.rating)}</span>}
+                                                                </div>
                                                                 <div className="text-xs text-slate-400">{u.phone_number}</div>
                                                             </div>
                                                         </div>
@@ -1265,6 +1300,14 @@
                                             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">BG Check Expiry</label>
                                             <input type="date" value={editingUmpire.background_check_expiry} onChange={e => setEditingUmpire({...editingUmpire, background_check_expiry: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Rating (1-5)</label>
+                                        <input type="number" min="0" max="5" value={editingUmpire.rating || 0} onChange={e => setEditingUmpire({...editingUmpire, rating: parseInt(e.target.value) || 0})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Private Notes</label>
+                                        <textarea value={editingUmpire.notes || ""} onChange={e => setEditingUmpire({...editingUmpire, notes: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none"></textarea>
                                     </div>
                                     <button type="submit" className="w-full btn-gradient py-3 rounded-lg text-white font-bold mt-4">Save Changes</button>
                                 </form>
