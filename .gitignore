@@ -1,0 +1,12 @@
+# Python environment
+venv/
+__pycache__/
+*.pyc
+
+# Database
+*.db
+umpire_data.db
+test_umpires.db
+
+# OS files
+.DS_Store

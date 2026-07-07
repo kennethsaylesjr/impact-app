@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impact App</title>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <!-- Modern Typography: Outfit & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; padding: 0; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+        h1, h2, h3, h4, h5, h6, .brand {
+            font-family: 'Outfit', sans-serif;
+        }
+        
+        /* Premium Glassmorphism */
+        .glass { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            border-radius: 20px; 
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        
+        .glass-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(0,0,0,0.3);
+            border-color: rgba(255,255,255,0.1);
+        }
+
+        /* Modern Chat Bubbles */
+        .user-bubble {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-top-left-radius: 16px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-top-right-radius: 4px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        .agent-bubble {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top-right-radius: 16px; border-bottom-right-radius: 16px; border-bottom-left-radius: 16px; border-top-left-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Buttons & Inputs */
+        .btn-gradient {
+            background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-gradient:hover {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            transform: translateY(-1px);
+        }
+        
+        input, select {
+            background: rgba(15, 23, 42, 0.6) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            transition: all 0.2s ease;
+        }
+        input:focus, select:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+            outline: none;
+        }
+
+        /* Scrollbar */
+        .chat-scroll::-webkit-scrollbar { width: 4px; }
+        .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        
+        /* Animations */
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .loader { border: 2px solid rgba(255,255,255,0.1); border-left-color: #3b82f6; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Glowing Ambient Orbs */
+        .glow-orb-1 { position: fixed; top: -100px; left: -100px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(79, 70, 229, 0.15) 0%, rgba(0,0,0,0) 70%); z-index: -1; }
+        .glow-orb-2 { position: fixed; bottom: -100px; right: -100px; width: 500px; height: 500px; background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(0,0,0,0) 70%); z-index: -1; }
+    </style>
+</head>
+<body>
+    <div class="glow-orb-1"></div>
+    <div class="glow-orb-2"></div>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [user, setUser] = useState(null);
+
+            if (!user) {
+                return <LoginScreen onLogin={setUser} />;
+            }
+
+            return (
+                <div className="fade-in">
+                    <header className="px-8 py-5 flex justify-between items-center glass border-x-0 border-t-0 rounded-none mb-8 sticky top-0 z-50">
+                        <div className="brand font-bold text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400 flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+                                <span className="text-white font-bold text-lg leading-none">I</span>
+                            </div>
+                            <span>Impact App {user.role === 'admin' ? 'Admin' : 'Portal'}</span>
+                        </div>
+                        <div className="flex items-center space-x-6">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-sm">
+                                    {user.name.charAt(0)}
+                                </div>
+                                <span className="text-slate-300 font-medium">{user.name}</span>
+                            </div>
+                            <button onClick={() => setUser(null)} className="px-5 py-2 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 transition">Log Out</button>
+                        </div>
+                    </header>
+                    <main className="px-6 max-w-7xl mx-auto pb-12">
+                        {user.role === 'admin' ? <AdminDashboard /> : <UmpirePortal user={user} />}
+                    </main>
+                </div>
+            );
+        }
+
+        function LoginScreen({ onLogin }) {
+
+            const [name, setName] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setError('');
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    onLogin({ role: data.role, name, id: data.umpire_id });
+                } else {
+                    setError('Invalid credentials');
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden fade-in">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 z-0"></div>
+                    <div className="glass p-10 w-full max-w-md relative z-10">
+                        <div className="text-center mb-8">
+                            <div className="flex items-center justify-center space-x-3 mb-4">
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                                    <span className="text-white font-bold text-xl">I</span>
+                                </div>
+                                <h1 className="brand text-xl font-bold text-white tracking-wide">Impact App</h1>
+                            </div>
+                            <p className="text-slate-400 text-sm">Sign in to manage your umpiring schedule.</p>
+                        </div>
+                        <form onSubmit={handleLogin} className="space-y-5">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Username</label>
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} required className="w-full rounded-lg p-3.5 text-white" placeholder="e.g. admin or John Doe" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full rounded-lg p-3.5 text-white" />
+                            </div>
+                            {error && <div className="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded border border-red-500/20">{error}</div>}
+                            <button type="submit" className="w-full btn-gradient text-white font-semibold py-3.5 rounded-lg mt-2 text-lg">Sign In</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function UmpirePortal({ user }) {
+            const [games, setGames] = useState([]);
+            const [available, setAvailable] = useState(true);
+
+            const fetchData = async () => {
+                const [gamesRes, umpiresRes] = await Promise.all([
+                    fetch('/api/games'),
+                    fetch('/api/umpires')
+                ]);
+                const gData = await gamesRes.json();
+                const uData = await umpiresRes.json();
+                
+                setGames(gData.filter(g => g.umpire_id === user.id));
+                const me = uData.find(u => u.id === user.id);
+                if (me) setAvailable(me.available);
+            };
+
+            useEffect(() => {
+                fetchData();
+            }, []);
+
+            const toggleStatus = async () => {
+                const newStatus = !available;
+                setAvailable(newStatus);
+                await fetch('/api/toggle_availability', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ umpire_id: user.id, available: newStatus })
+                });
+            };
+
+            const handleReportScore = async (gameId, currentStatus, currentScore) => {
+                const newStatus = prompt("Enter Game Status (e.g., Completed, Rained Out, Forfeited, Scheduled):", currentStatus || "Completed");
+                if (!newStatus) return;
+                const newScore = prompt("Enter Final Score (e.g., 5-3, or leave blank):", currentScore || "");
+                
+                await fetch('/api/report_score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_id: gameId, status: newStatus, score: newScore })
+                });
+                fetchData();
+            };
+
+            return (
+                <div className="space-y-8 fade-in">
+                    <div className="glass p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                        <div>
+                            <h3 className="brand text-2xl font-bold text-white">Availability Status</h3>
+                            <p className="text-slate-400 text-sm mt-1">Let the admin know if you are ready to accept new games.</p>
+                        </div>
+                        <button 
+                            onClick={toggleStatus} 
+                            className={`px-8 py-3.5 rounded-xl font-bold tracking-wide transition-all shadow-lg text-sm sm:text-base ${
+                                available 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50' 
+                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 hover:border-rose-500/50'
+                            }`}
+                        >
+                            {available ? '🟢 I AM AVAILABLE' : '🔴 I AM UNAVAILABLE'}
+                        </button>
+                    </div>
+
+                    <div className="glass p-8">
+                        <h3 className="brand text-2xl font-bold mb-6 text-white">Your Upcoming Schedule</h3>
+                        {games.length === 0 ? (
+                            <div className="text-center py-16 px-4 glass-card border-dashed">
+                                <div className="text-4xl mb-4">📅</div>
+                                <h4 className="text-lg font-medium text-slate-300">No games assigned yet</h4>
+                                <p className="text-slate-500 mt-2 text-sm">When the admin assigns you a game, it will appear here.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {games.map(g => (
+                                    <div key={g.game_id} className="glass-card p-6 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                                        <div className="text-xs font-semibold text-blue-400 mb-3 uppercase tracking-wider">Game #{g.game_id}</div>
+                                        <div className="text-2xl font-bold text-white mb-1">{g.date}</div>
+                                        <div className="text-slate-300 mb-4 flex items-center"><span className="text-lg mr-2">⏰</span> {g.time}</div>
+                                        <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                                            <a 
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(g.location)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-400 text-sm hover:text-blue-300 transition flex items-center"
+                                                title="Open in Google Maps"
+                                            >
+                                                📍 {g.location}
+                                            </a>
+                                            <div className="text-right">
+                                                <div className={`text-xs font-bold ${g.status === 'Scheduled' ? 'text-blue-400' : g.status === 'Completed' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {g.status}
+                                                </div>
+                                                {g.score && <div className="text-white text-sm font-bold">{g.score}</div>}
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleReportScore(g.game_id, g.status, g.score)}
+                                            className="w-full mt-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded text-sm transition"
+                                        >
+                                            Update Status / Score
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function AdminDashboard() {
+            const [games, setGames] = useState([]);
+            const [umpires, setUmpires] = useState([]);
+            const [chat, setChat] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const chatEndRef = useRef(null);
+            
+            const [activeTab, setActiveTab] = React.useState('schedule');
+            const [searchQuery, setSearchQuery] = React.useState('');
+            const [csvText, setCsvText] = React.useState("Name,Phone,Level,Pay Rate,Reg Expiry,BG Expiry\nAlex Miller,+15551112222,Junior,45.0,2027-01-01,2027-01-01");
+            const [gameCsvText, setGameCsvText] = React.useState("");
+            const [importing, setImporting] = React.useState(false);
+            const [gameImporting, setGameImporting] = React.useState(false);
+
+            const [leagueCity, setLeagueCity] = React.useState("New York");
+            const [weather, setWeather] = React.useState(null);
+            const [showSmsModal, setShowSmsModal] = React.useState(false);
+
+            const isExpired = (dateStr) => {
+                if (!dateStr) return true;
+                return new Date(dateStr) < new Date();
+            };
+
+            const fetchData = async () => {
+                const [gamesRes, umpiresRes] = await Promise.all([
+                    fetch('/api/games'),
+                    fetch('/api/umpires')
+                ]);
+                setGames(await gamesRes.json());
+                setUmpires(await umpiresRes.json());
+            };
+
+            useEffect(() => {
+                fetchData();
+                const interval = setInterval(fetchData, 5000);
+                return () => clearInterval(interval);
+            }, []);
+
+            useEffect(() => {
+                async function fetchWeather() {
+                    try {
+                        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(leagueCity)}&count=1`);
+                        const geoData = await geoRes.json();
+                        if (geoData.results && geoData.results.length > 0) {
+                            const { latitude, longitude } = geoData.results[0];
+                            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+                            const weatherData = await weatherRes.json();
+                            setWeather(weatherData.current_weather);
+                        }
+                    } catch (e) {
+                        console.error("Weather fetch failed");
+                    }
+                }
+                fetchWeather();
+            }, [leagueCity]);
+
+            useEffect(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [chat]);
+
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                if (!input.trim()) return;
+                
+                const userMsg = input;
+                setInput('');
+                setChat(prev => [...prev, { role: 'user', text: userMsg }]);
+                setLoading(true);
+
+                try {
+                    const res = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userMsg })
+                    });
+                    const data = await res.json();
+                    setChat(prev => [...prev, { role: 'agent', text: data.reply }]);
+                    fetchData(); 
+                } catch (err) {
+                    setChat(prev => [...prev, { role: 'agent', text: 'Error connecting to agent backend.' }]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleReassign = async (gameId, umpireName) => {
+                if (!umpireName) return;
+                const res = await fetch('/api/reassign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_id: gameId, umpire_name: umpireName })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    alert(data.message);
+                }
+                fetchData();
+            };
+
+            const handleImport = async () => {
+                if (!csvText.trim()) return;
+                setImporting(true);
+                const rows = csvText.split('\n').map(r => r.trim()).filter(r => r);
+                const umpList = rows.map(r => {
+                    const cols = r.split(',');
+                    return {
+                        name: cols[0]?.trim() || "",
+                        phone_number: cols[1]?.trim() || "",
+                        level: cols[2]?.trim() || "Junior",
+                        pay_rate: parseFloat(cols[3]) || 50.0,
+                        registration_expiry: cols[4]?.trim() || "",
+                        background_check_expiry: cols[5]?.trim() || ""
+                    };
+                });
+                
+                try {
+                    const res = await fetch('/api/import_roster', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({umpires: umpList})
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert(`Successfully imported ${data.inserted} umpires!`);
+                        setCsvText("");
+                        fetchData();
+                    } else {
+                        alert(`Import had errors:\n` + data.errors.join('\n'));
+                    }
+                } catch (e) {
+                    alert("Import failed: " + e.message);
+                }
+                setImporting(false);
+            };
+
+            const handleGameImport = async () => {
+                if (!gameCsvText.trim()) return;
+                setGameImporting(true);
+                const rows = gameCsvText.split('\n').map(r => r.trim()).filter(r => r);
+                const gameList = rows.map(r => {
+                    const cols = r.split(',');
+                    return {
+                        date: cols[0]?.trim() || "",
+                        time: cols[1]?.trim() || "",
+                        location: cols[2]?.trim() || ""
+                    };
+                });
+                
+                try {
+                    const res = await fetch('/api/import_games', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({games: gameList})
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert(`Successfully imported ${data.inserted} games!`);
+                        setGameCsvText("");
+                        fetchData();
+                    } else {
+                        alert(`Import had errors:\n` + data.errors.join('\n'));
+                    }
+                } catch (e) {
+                    alert("Import failed: " + e.message);
+                }
+                setGameImporting(false);
+            };
+
+            // Calculate Payroll
+            const payrollData = umpires.map(u => {
+                const assignedGames = games.filter(g => g.umpire_id === u.id);
+                return {
+                    umpire: u,
+                    gamesCount: assignedGames.length,
+                    totalPayout: assignedGames.length * u.pay_rate
+                };
+            }).sort((a, b) => b.totalPayout - a.totalPayout);
+
+            const totalSystemPayroll = payrollData.reduce((acc, curr) => acc + curr.totalPayout, 0);
+
+            const handleExportPayroll = () => {
+                let csv = "Umpire Name,Games Assigned,Total Payout\n";
+                payrollData.forEach(p => {
+                    csv += `${p.umpire.name},${p.gamesCount},${p.totalPayout.toFixed(2)}\n`;
+                });
+                csv += `TOTAL,,${totalSystemPayroll.toFixed(2)}\n`;
+                
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `payroll_export_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+
+            const handleMassRainout = async () => {
+                const location = prompt("Enter the exact Location name to rain out (e.g. 'Field Z'):");
+                if (!location) return;
+                const confirmRainout = confirm(`Are you sure you want to cancel ALL scheduled games today at ${location}?`);
+                if (!confirmRainout) return;
+                
+                const today = new Date().toISOString().split('T')[0];
+                try {
+                    const res = await fetch('/api/mass_rainout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ location: location, date: today })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert(`Successfully rained out ${data.updated} games at ${location}.`);
+                        fetchData();
+                    } else {
+                        alert("Mass Rainout failed.");
+                    }
+                } catch (e) {
+                    alert("Error communicating with server.");
+                }
+            };
+
+            const handleGeneratePDF = (umpireData) => {
+                if (!window.jspdf) {
+                    alert("PDF Library is still loading...");
+                    return;
+                }
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Branding
+                doc.setFillColor(30, 27, 75); // Dark blue
+                doc.rect(0, 0, 210, 40, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(24);
+                doc.text("Impact App", 14, 25);
+                doc.setFontSize(12);
+                doc.text("Umpire Invoice", 170, 25);
+                
+                // Details
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(14);
+                doc.text(`Umpire: ${umpireData.umpire.name}`, 14, 60);
+                doc.setFontSize(10);
+                doc.text(`Level: ${umpireData.umpire.level}`, 14, 66);
+                doc.text(`Pay Rate: $${umpireData.umpire.pay_rate.toFixed(2)}/game`, 14, 72);
+                doc.text(`Date Generated: ${new Date().toLocaleDateString()}`, 14, 78);
+                
+                // Table
+                const gamesAssigned = games.filter(g => g.umpire_id === umpireData.umpire.id);
+                const tableData = gamesAssigned.map(g => [
+                    g.date,
+                    g.time,
+                    g.location,
+                    g.status,
+                    `$${umpireData.umpire.pay_rate.toFixed(2)}`
+                ]);
+                
+                doc.autoTable({
+                    startY: 90,
+                    head: [['Date', 'Time', 'Location', 'Status', 'Payout']],
+                    body: tableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [59, 130, 246] }
+                });
+                
+                const finalY = doc.lastAutoTable.finalY || 90;
+                doc.setFontSize(16);
+                doc.setTextColor(16, 185, 129); // Emerald
+                doc.text(`Total Payout: $${umpireData.totalPayout.toFixed(2)}`, 14, finalY + 20);
+                
+                doc.save(`Invoice_${umpireData.umpire.name.replace(/\\s+/g, '_')}.pdf`);
+            };
+
+            const handleMasterInvoice = () => {
+                if (!window.jspdf) {
+                    alert("PDF Library is still loading...");
+                    return;
+                }
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.setFillColor(30, 27, 75);
+                doc.rect(0, 0, 210, 40, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(24);
+                doc.text("Impact App", 14, 25);
+                doc.setFontSize(12);
+                doc.text("Master League Invoice", 150, 25);
+                
+                doc.setTextColor(0, 0, 0);
+                doc.text(`Date Generated: ${new Date().toLocaleDateString()}`, 14, 60);
+                
+                const tableData = payrollData.map(p => [
+                    p.umpire.name,
+                    p.gamesCount,
+                    `$${p.totalPayout.toFixed(2)}`
+                ]);
+                
+                doc.autoTable({
+                    startY: 70,
+                    head: [['Umpire', 'Games Worked', 'Total Owed']],
+                    body: tableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [59, 130, 246] }
+                });
+                
+                const finalY = doc.lastAutoTable.finalY || 70;
+                doc.setFontSize(18);
+                doc.setTextColor(16, 185, 129);
+                doc.text(`GRAND TOTAL: $${totalSystemPayroll.toFixed(2)}`, 14, finalY + 20);
+                
+                doc.save(`Master_Invoice_${new Date().toLocaleDateString().replace(/\\//g, '-')}.pdf`);
+            };
+
+            return (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 fade-in">
+                    <div className="lg:col-span-2 space-y-6">
+                        
+                        {/* Tab Navigation */}
+                        <div className="glass p-2 flex space-x-2">
+                            <button onClick={() => setActiveTab('schedule')} className={`flex-1 py-3 rounded-xl font-semibold transition ${activeTab === 'schedule' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>Live Schedule</button>
+                            <button onClick={() => setActiveTab('roster')} className={`flex-1 py-3 rounded-xl font-semibold transition ${activeTab === 'roster' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>Roster & Import</button>
+                            <button onClick={() => setActiveTab('payroll')} className={`flex-1 py-3 rounded-xl font-semibold transition ${activeTab === 'payroll' ? 'bg-emerald-500/20 text-emerald-300' : 'text-slate-400 hover:text-emerald-300 hover:bg-emerald-500/10'}`}>💰 Payroll</button>
+                        </div>
+
+                        {/* SCHEDULE TAB */}
+                        {activeTab === 'schedule' && (
+                            <div className="glass p-8 fade-in">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                                    <div className="flex items-center space-x-4">
+                                        <h2 className="brand text-2xl font-bold text-white">Live Games</h2>
+                                        {weather && (
+                                            <div className="flex items-center space-x-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-white/5">
+                                                <span className="text-xl">{weather.weathercode <= 3 ? '☀️' : weather.weathercode <= 60 ? '☁️' : '🌧️'}</span>
+                                                <span className="text-white font-medium">{weather.temperature}°C</span>
+                                                <span className="text-slate-400 text-xs ml-1">{leagueCity}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center space-x-3">
+                                        <button 
+                                            onClick={handleMassRainout}
+                                            className="px-4 py-2 bg-rose-500/10 text-rose-400 text-sm rounded-lg font-medium border border-rose-500/20 hover:bg-rose-500/20 transition flex items-center"
+                                        >
+                                            🌧️ Mass Rainout
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowSmsModal(true)}
+                                            className="px-4 py-2 bg-blue-500/10 text-blue-400 text-sm rounded-lg font-medium border border-blue-500/20 hover:bg-blue-500/20 transition flex items-center"
+                                        >
+                                            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                                            Blast Weekly Schedule
+                                        </button>
+                                        <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs rounded-full font-medium border border-emerald-500/20 hidden lg:inline-block">Auto-syncing</span>
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-slate-900/50">
+                                            <tr>
+                                                <td colSpan="6" className="p-4 border-b border-white/10">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="🔍 Search by Location, Umpire Name, or Game ID..." 
+                                                        className="w-full bg-slate-800/50 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-blue-500 transition"
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                    />
+                                                </td>
+                                            </tr>
+                                            <tr className="text-slate-400 text-sm tracking-wider uppercase border-b border-white/10">
+                                                <th className="pb-4 font-medium pl-2">ID</th>
+                                                <th className="pb-4 font-medium">Schedule</th>
+                                                <th className="pb-4 font-medium">Location</th>
+                                                <th className="pb-4 font-medium">Status/Score</th>
+                                                <th className="pb-4 font-medium">Assigned Umpire</th>
+                                                <th className="pb-4 font-medium text-right pr-2">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="text-sm">
+                                            {games.filter(g => {
+                                                if (!searchQuery) return true;
+                                                const q = searchQuery.toLowerCase();
+                                                const assigned = umpires.find(u => u.id === g.umpire_id);
+                                                const uName = assigned ? assigned.name.toLowerCase() : "";
+                                                return g.location.toLowerCase().includes(q) || 
+                                                       g.game_id.toString().includes(q) || 
+                                                       uName.includes(q);
+                                            }).map(g => {
+                                                const assigned = umpires.find(u => u.id === g.umpire_id);
+                                                return (
+                                                    <tr key={g.game_id} className="border-b border-white/5 hover:bg-white/[0.02] transition">
+                                                        <td className="py-4 pl-2 font-medium text-slate-300">#{g.game_id}</td>
+                                                        <td className="py-4 text-white">
+                                                            <div className="font-semibold">{g.date}</div>
+                                                            <div className="text-slate-400 text-xs mt-1">{g.time}</div>
+                                                        </td>
+                                                        <td className="py-4 text-slate-300">
+                                                            <div className="flex items-center">
+                                                                <svg className="w-4 h-4 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                                                {g.location}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4">
+                                                            <span className={`px-2 py-1 rounded text-xs font-bold ${g.status === 'Scheduled' ? 'bg-blue-500/10 text-blue-400' : g.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                                {g.status}
+                                                            </span>
+                                                            {g.score && <div className="text-white font-bold mt-1">{g.score}</div>}
+                                                        </td>
+                                                        <td className="py-4">
+                                                            <select 
+                                                                className="w-full rounded p-2 text-slate-200 cursor-pointer"
+                                                                value={assigned ? assigned.name : ""}
+                                                                onChange={(e) => handleReassign(g.game_id, e.target.value)}
+                                                            >
+                                                                <option value="">-- Click to Assign --</option>
+                                                                {umpires.map(u => {
+                                                                    const expired = isExpired(u.registration_expiry) || isExpired(u.background_check_expiry);
+                                                                    return (
+                                                                        <option key={u.id} value={u.name}>
+                                                                            {u.name} {u.available ? '(Avail)' : '(Unavail)'} {expired ? '(EXPIRED)' : ''}
+                                                                        </option>
+                                                                    );
+                                                                })}
+                                                            </select>
+                                                        </td>
+                                                        <td className="py-4 text-right pr-2">
+                                                            {assigned && (
+                                                                <a 
+                                                                    href={`sms:${assigned.phone_number}?body=Hey ${assigned.name}, you are assigned to Game #${g.game_id} on ${g.date} at ${g.time}. Location: ${g.location}. Please confirm!`}
+                                                                    className="inline-flex items-center justify-center p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition"
+                                                                    title="Send SMS"
+                                                                >
+                                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                                                                </a>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ROSTER TAB */}
+                        {activeTab === 'roster' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="glass p-8">
+                                        <h2 className="brand text-2xl font-bold text-white mb-6">Import Games (CSV)</h2>
+                                        <p className="text-slate-400 text-sm mb-4">Paste league schedule here. Date, Time, Location.</p>
+                                        <textarea 
+                                            className="w-full h-32 bg-slate-900/80 border border-white/10 rounded-lg p-4 text-sm font-mono text-blue-300 focus:outline-none focus:border-blue-500 mb-4"
+                                            value={gameCsvText}
+                                            onChange={(e) => setGameCsvText(e.target.value)}
+                                            placeholder="2026-07-20,12:00,Field Z"
+                                        ></textarea>
+                                        <button onClick={handleGameImport} disabled={gameImporting} className="btn-gradient px-8 py-3 rounded-lg text-white font-bold disabled:opacity-50 w-full">
+                                            {gameImporting ? "Importing..." : "Run Games Import"}
+                                        </button>
+                                    </div>
+                                    <div className="glass p-8">
+                                        <h2 className="brand text-2xl font-bold text-white mb-6">Import Umpire Roster (CSV)</h2>
+                                        <p className="text-slate-400 text-sm mb-4">Name, Phone, Level, Pay Rate, Reg Expiry, BG Expiry</p>
+                                        <textarea 
+                                            className="w-full h-32 bg-slate-900/80 border border-white/10 rounded-lg p-4 text-sm font-mono text-blue-300 focus:outline-none focus:border-blue-500 mb-4"
+                                            value={csvText}
+                                            onChange={(e) => setCsvText(e.target.value)}
+                                            placeholder="John Doe,555-0101,Senior,70,2026-12-31,2026-12-31"
+                                        ></textarea>
+                                        <button onClick={handleImport} disabled={importing} className="btn-gradient px-8 py-3 rounded-lg text-white font-bold disabled:opacity-50 w-full">
+                                            {importing ? "Importing..." : "Run Roster Import"}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="glass p-8">
+                                    <h2 className="brand text-2xl font-bold text-white mb-6">Current Roster ({umpires.length})</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {umpires.map(u => {
+                                            const bgExp = isExpired(u.background_check_expiry);
+                                            const regExp = isExpired(u.registration_expiry);
+                                            const isExp = bgExp || regExp;
+                                            return (
+                                                <div key={u.id} className={`glass-card p-5 flex flex-col justify-between ${isExp ? 'border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.1)]' : ''}`}>
+                                                    <div className="flex justify-between items-start mb-4">
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="relative">
+                                                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-300 border border-white/10">
+                                                                    {u.name.charAt(0)}
+                                                                </div>
+                                                                <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 border-2 border-[#1e1b4b] rounded-full ${u.available ? 'bg-emerald-400' : 'bg-rose-400'}`}></div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-bold text-white">{u.name}</div>
+                                                                <div className="text-xs text-slate-400">{u.phone_number}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="px-2.5 py-1 bg-white/5 border border-white/10 rounded text-xs font-medium text-slate-300 mb-1">{u.level}</span>
+                                                            {isExp && <span className="text-[10px] font-bold text-rose-400 uppercase">Expired Credentials</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-slate-900/50 rounded-lg p-3 text-xs flex justify-between border border-white/5">
+                                                        <div className="text-slate-400">Rate: <span className="text-emerald-400 font-bold">${u.pay_rate}</span>/game</div>
+                                                        <div className="flex flex-col text-right">
+                                                            <span className={regExp ? 'text-rose-400 font-bold' : 'text-slate-400'}>Reg: {u.registration_expiry}</span>
+                                                            <span className={bgExp ? 'text-rose-400 font-bold' : 'text-slate-400'}>BG: {u.background_check_expiry}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* PAYROLL TAB */}
+                        {activeTab === 'payroll' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="glass p-8 flex items-center justify-between border-l-4 border-emerald-500 relative">
+                                    <div>
+                                        <h2 className="brand text-3xl font-bold text-white">Total Payroll</h2>
+                                        <p className="text-slate-400 mt-1">Based on currently assigned live games.</p>
+                                    </div>
+                                    <div className="text-right flex flex-col space-y-2 items-end">
+                                        <div className="text-4xl font-bold text-emerald-400 mb-2">${totalSystemPayroll.toFixed(2)}</div>
+                                        <div className="flex space-x-2">
+                                            <button onClick={handleMasterInvoice} className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded text-sm transition border border-emerald-500/30 flex items-center">
+                                                📄 Master Invoice
+                                            </button>
+                                            <button onClick={handleExportPayroll} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded text-sm transition">
+                                                📥 Export CSV
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="glass p-8">
+                                    <h3 className="brand text-xl font-bold text-white mb-6">Umpire Breakdown</h3>
+                                    <div className="space-y-4">
+                                        {payrollData.map((data, i) => (
+                                            <div key={i} className="glass-card p-4 flex items-center justify-between">
+                                                <div className="flex items-center space-x-4">
+                                                    <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-300 border border-white/10">
+                                                        {data.umpire.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-white text-lg">{data.umpire.name}</div>
+                                                        <div className="text-sm text-slate-400">{data.gamesCount} Game(s) @ ${data.umpire.pay_rate}/game</div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right flex flex-col space-y-2 items-end">
+                                                    <div className="text-2xl font-bold text-emerald-400 bg-emerald-500/10 px-4 py-2 rounded-lg border border-emerald-500/20">
+                                                        ${data.totalPayout.toFixed(2)}
+                                                    </div>
+                                                    <button onClick={() => handleGeneratePDF(data)} className="text-xs px-3 py-1 bg-white/10 hover:bg-white/20 rounded transition text-slate-300 flex items-center">
+                                                        📄 PDF Invoice
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="glass flex flex-col h-[650px] lg:h-auto lg:max-h-[850px] sticky top-28">
+                        <div className="p-5 border-b border-white/10 flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            </div>
+                            <div>
+                                <h2 className="brand font-bold text-white text-lg">AI Assistant</h2>
+                                <div className="text-xs text-blue-400 flex items-center"><span className="w-2 h-2 rounded-full bg-blue-400 mr-1.5 animate-pulse"></span> Online</div>
+                            </div>
+                        </div>
+                        <div className="flex-1 p-5 overflow-y-auto chat-scroll space-y-5">
+                            {chat.map((msg, i) => (
+                                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`px-4 py-3 text-sm leading-relaxed max-w-[85%] ${msg.role === 'user' ? 'user-bubble text-white' : 'agent-bubble text-slate-200'}`}>
+                                        {msg.text}
+                                    </div>
+                                </div>
+                            ))}
+                            {loading && (
+                                <div className="flex justify-start">
+                                    <div className="agent-bubble px-4 py-3 flex items-center space-x-3">
+                                        <div className="loader"></div>
+                                        <span className="text-sm text-slate-400">Processing request...</span>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={chatEndRef}></div>
+                        </div>
+                        <div className="p-4 border-t border-white/10 bg-black/10">
+                            <form onSubmit={sendMessage} className="flex space-x-2">
+                                <input 
+                                    type="text" 
+                                    value={input}
+                                    onChange={e => setInput(e.target.value)}
+                                    placeholder="Ask the AI agent..."
+                                    className="flex-1 rounded-full px-5 py-3 text-sm text-white focus:outline-none"
+                                />
+                                <button type="submit" disabled={loading} className="btn-gradient text-white rounded-full p-2 w-11 h-11 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    {/* Weekly SMS Blast Modal */}
+                    {showSmsModal && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center fade-in p-4">
+                            <div className="glass w-full max-w-2xl max-h-[80vh] flex flex-col">
+                                <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                                    <h3 className="text-xl font-bold text-white flex items-center">
+                                        <svg className="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                                        Weekly SMS Blast
+                                    </h3>
+                                    <button onClick={() => setShowSmsModal(false)} className="text-slate-400 hover:text-white transition">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                                <div className="p-6 overflow-y-auto chat-scroll flex-1 space-y-4">
+                                    {(() => {
+                                        const umpsWithGames = payrollData.filter(p => p.gamesCount > 0);
+                                        if (umpsWithGames.length === 0) return <div className="text-slate-400 text-center py-8">No assigned games found.</div>;
+                                        
+                                        return umpsWithGames.map((data, idx) => {
+                                            const uGames = games.filter(g => g.umpire_id === data.umpire.id);
+                                            const msgBody = "Your Upcoming Schedule:\n" + uGames.map(g => `${g.date} ${g.time} @ ${g.location}`).join('\n') + "\n\nPlease confirm receipt!";
+                                            return (
+                                                <div key={idx} className="glass-card p-4 flex justify-between items-center">
+                                                    <div>
+                                                        <div className="text-white font-bold">{data.umpire.name}</div>
+                                                        <div className="text-slate-400 text-sm">{data.gamesCount} games scheduled</div>
+                                                    </div>
+                                                    <a 
+                                                        href={`sms:${data.umpire.phone_number}?body=${encodeURIComponent(msgBody)}`}
+                                                        className="px-4 py-2 bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 rounded-lg text-sm font-medium transition"
+                                                    >
+                                                        📲 Send Schedule
+                                                    </a>
+                                                </div>
+                                            );
+                                        });
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
