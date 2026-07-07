@@ -47,6 +47,7 @@ def init_db():
             status TEXT DEFAULT 'Scheduled',
             score TEXT DEFAULT NULL,
             game_type TEXT DEFAULT 'League',
+            field_name TEXT DEFAULT '',
             FOREIGN KEY (umpire_id) REFERENCES umpires (id)
         )
     ''')
@@ -62,6 +63,10 @@ def init_db():
         pass
     try:
         cursor.execute("ALTER TABLE games ADD COLUMN game_type TEXT DEFAULT 'League'")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE games ADD COLUMN field_name TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
 

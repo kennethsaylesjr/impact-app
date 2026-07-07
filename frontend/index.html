@@ -296,13 +296,13 @@
                                         <div className="text-slate-300 mb-4 flex items-center"><span className="text-lg mr-2">⏰</span> {g.time}</div>
                                         <div className="pt-4 border-t border-white/10 flex items-center justify-between">
                                             <a 
-                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(g.location)}`}
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(g.location + (g.field_name ? ' ' + g.field_name : ''))}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-blue-400 text-sm hover:text-blue-300 transition flex items-center"
                                                 title="Open in Google Maps"
                                             >
-                                                📍 {g.location}
+                                                📍 {g.location}{g.field_name ? ` - ${g.field_name}` : ''}
                                             </a>
                                             <div className="text-right">
                                                 <div className={`text-xs font-bold ${g.status === 'Scheduled' ? 'text-blue-400' : g.status === 'Completed' ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -313,7 +313,7 @@
                                         </div>
                                         <div className="flex space-x-2 mt-4">
                                             <a 
-                                                href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=Umpiring+Game&dates=${new Date(`${g.date}T${g.time}`).toISOString().replace(/-|:|\.\d\d\d/g,"")}/${new Date(new Date(`${g.date}T${g.time}`).getTime() + 7200000).toISOString().replace(/-|:|\.\d\d\d/g,"")}&details=Umpiring+Assignment&location=${encodeURIComponent(g.location)}`}
+                                                href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=Umpiring+Game&dates=${new Date(`${g.date}T${g.time}`).toISOString().replace(/-|:|\.\d\d\d/g,"")}/${new Date(new Date(`${g.date}T${g.time}`).getTime() + 7200000).toISOString().replace(/-|:|\.\d\d\d/g,"")}&details=Umpiring+Assignment&location=${encodeURIComponent(g.location + (g.field_name ? ' ' + g.field_name : ''))}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="w-1/2 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded text-xs font-bold transition flex items-center justify-center text-center"
@@ -321,7 +321,7 @@
                                                 Google Cal
                                             </a>
                                             <a 
-                                                href={`data:text/calendar;charset=utf8,${encodeURIComponent("BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:" + new Date(`${g.date}T${g.time}`).toISOString().replace(/-|:|\.\d\d\d/g,"") + "\nDTEND:" + new Date(new Date(`${g.date}T${g.time}`).getTime() + 7200000).toISOString().replace(/-|:|\.\d\d\d/g,"") + "\nSUMMARY:Umpiring Game\nLOCATION:" + g.location + "\nEND:VEVENT\nEND:VCALENDAR")}`}
+                                                href={`data:text/calendar;charset=utf8,${encodeURIComponent("BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:" + new Date(`${g.date}T${g.time}`).toISOString().replace(/-|:|\.\d\d\d/g,"") + "\nDTEND:" + new Date(new Date(`${g.date}T${g.time}`).getTime() + 7200000).toISOString().replace(/-|:|\.\d\d\d/g,"") + "\nSUMMARY:Umpiring Game\nLOCATION:" + g.location + (g.field_name ? ' ' + g.field_name : '') + "\nEND:VEVENT\nEND:VCALENDAR")}`}
                                                 download={`Game_${g.game_id}.ics`}
                                                 className="w-1/2 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 rounded text-xs font-bold transition flex items-center justify-center text-center"
                                             >
@@ -430,7 +430,7 @@
 
             const [showAddGameModal, setShowAddGameModal] = React.useState(false);
             const [newGame, setNewGame] = React.useState({
-                date: '', time: '', location: '', game_type: 'League'
+                date: '', time: '', location: '', game_type: 'League', field_name: ''
             });
 
             const [showEditGameModal, setShowEditGameModal] = React.useState(false);
@@ -933,6 +933,7 @@
                                                 const assigned = umpires.find(u => u.id === g.umpire_id);
                                                 const uName = assigned ? assigned.name.toLowerCase() : "";
                                                 return g.location.toLowerCase().includes(q) || 
+                                                       (g.field_name && g.field_name.toLowerCase().includes(q)) ||
                                                        g.game_id.toString().includes(q) || 
                                                        uName.includes(q);
                                             }).map(g => {
@@ -947,7 +948,7 @@
                                                         <td className="py-4 text-slate-300">
                                                             <div className="flex items-center">
                                                                 <svg className="w-4 h-4 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                                                {g.location}
+                                                                {g.location}{g.field_name ? ` - ${g.field_name}` : ''}
                                                             </div>
                                                             <div className="text-xs mt-1 text-slate-400">
                                                                 {g.game_type === 'Tournament' ? '🏆 Tournament' : '⚾ League'}
@@ -979,7 +980,7 @@
                                                         <td className="py-4 text-right pr-2 flex items-center justify-end space-x-2">
                                                             {assigned && (
                                                                 <a 
-                                                                    href={`sms:${assigned.phone_number}?body=Hey ${assigned.name}, you are assigned to Game #${g.game_id} on ${g.date} at ${g.time}. Location: ${g.location}. Please confirm!`}
+                                                                    href={`sms:${assigned.phone_number}?body=Hey ${assigned.name}, you are assigned to Game #${g.game_id} on ${g.date} at ${g.time}. Location: ${g.location}${g.field_name ? ' ' + g.field_name : ''}. Please confirm!`}
                                                                     className="inline-flex items-center justify-center p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition"
                                                                     title="Send SMS"
                                                                 >
@@ -1338,9 +1339,15 @@
                                     </button>
                                 </div>
                                 <form onSubmit={handleManualAddGame} className="p-6 space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Location / Field</label>
-                                        <input type="text" required value={newGame.location} onChange={e => setNewGame({...newGame, location: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Complex Name</label>
+                                            <input type="text" required placeholder="e.g. Centennial Park" value={newGame.location} onChange={e => setNewGame({...newGame, location: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Field</label>
+                                            <input type="text" placeholder="e.g. Field 1" value={newGame.field_name || ""} onChange={e => setNewGame({...newGame, field_name: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
+                                        </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -1376,9 +1383,15 @@
                                     </button>
                                 </div>
                                 <form onSubmit={handleManualEditGame} className="p-6 space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Location / Field</label>
-                                        <input type="text" required value={editingGame.location} onChange={e => setEditingGame({...editingGame, location: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Complex Name</label>
+                                            <input type="text" required placeholder="e.g. Centennial Park" value={editingGame.location} onChange={e => setEditingGame({...editingGame, location: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Field</label>
+                                            <input type="text" placeholder="e.g. Field 1" value={editingGame.field_name || ""} onChange={e => setEditingGame({...editingGame, field_name: e.target.value})} className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" />
+                                        </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -1423,7 +1436,7 @@
                                         
                                         return umpsWithGames.map((data, idx) => {
                                             const uGames = games.filter(g => g.umpire_id === data.umpire.id);
-                                            const msgBody = "Your Upcoming Schedule:\n" + uGames.map(g => `${g.date} ${g.time} @ ${g.location}`).join('\n') + "\n\nPlease confirm receipt!";
+                                            const msgBody = "Your Upcoming Schedule:\n" + uGames.map(g => `${g.date} ${g.time} @ ${g.location}${g.field_name ? ' ' + g.field_name : ''}`).join('\n') + "\n\nPlease confirm receipt!";
                                             return (
                                                 <div key={idx} className="glass-card p-4 flex justify-between items-center">
                                                     <div>
