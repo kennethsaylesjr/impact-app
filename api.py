@@ -6,42 +6,43 @@ from contextlib import asynccontextmanager
 import database
 import os
 
-# Global agent instance
-global_agent = None
+# Global agent/chat instance
+global_chat = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global global_agent
-    try:
-        from google.antigravity import Agent, LocalAgentConfig, types
-        from tools import get_unassigned_games, get_available_umpires, assign_umpire_to_game, reassign_umpire_to_game, check_credentials, send_sms_to_umpire
-        
-        config = LocalAgentConfig(
-            capabilities=types.CapabilitiesConfig(enable_subagents=True),
-            tools=[get_unassigned_games, get_available_umpires, assign_umpire_to_game, reassign_umpire_to_game, check_credentials, send_sms_to_umpire],
-            system_instruction=(
+    global global_chat
+    from tools import get_unassigned_games, get_available_umpires, assign_umpire_to_game, reassign_umpire_to_game, check_credentials, send_sms_to_umpire
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            
+            system_instruction = (
                 "You are the Manager Agent for an umpiring business. "
                 "You have tools connected to a live SQLite database. "
                 "You can send SMS messages using the send_sms_to_umpire tool."
             )
-        )
-        # Initialize and enter the agent context so it persists memory across API calls
-        global_agent = Agent(config)
-        await global_agent.__aenter__()
-        
-        # Load rulebook if it exists
-        from google.antigravity.types import Document
-        if os.path.exists("rulebook.pdf"):
-            rulebook = Document.from_file("rulebook.pdf")
-            await global_agent.chat(["This is the official USSSA Fastpitch Rulebook. Keep this in your context.", rulebook])
             
-        yield
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                tools=[get_unassigned_games, get_available_umpires, assign_umpire_to_game, reassign_umpire_to_game, check_credentials, send_sms_to_umpire],
+                system_instruction=system_instruction
+            )
+            
+            global_chat = model.start_chat(enable_automatic_function_calling=True)
+            
+            # Load rulebook if it exists (Optional context setting)
+            if os.path.exists("rulebook.pdf"):
+                global_chat.send_message("Keep the USSSA Fastpitch Rulebook in your context for answering questions.")
+        except Exception as e:
+            print(f"Failed to initialize Gemini: {e}")
+    else:
+        print("WARNING: GEMINI_API_KEY not found. API will run in Mock Mode.")
         
-        # Cleanup
-        await global_agent.__aexit__(None, None, None)
-    except ImportError:
-        print("WARNING: google-antigravity not found. API will run in Mock Mode.")
-        yield
+    yield
 
 app = FastAPI(lifespan=lifespan)
 
@@ -89,14 +90,15 @@ class MassRainoutRequest(BaseModel):
     date: str = None
 
 async def get_agent_response(msg: str) -> str:
-    global global_agent
-    if global_agent is not None:
-        if "GEMINI_API_KEY" not in os.environ:
-            return "Error: GEMINI_API_KEY is not set."
-        response = await global_agent.chat(msg)
-        return await response.text()
+    global global_chat
+    if global_chat is not None:
+        try:
+            response = global_chat.send_message(msg)
+            return response.text
+        except Exception as e:
+            return f"Error communicating with AI: {str(e)}"
     else:
-        return f"[MOCK AGENT]: I received your message: '{msg}'. Since the Antigravity SDK is not installed in this environment, I am responding in mock mode."
+        return f"[MOCK AGENT]: I received your message: '{msg}'. Since the GEMINI_API_KEY is not set, I am responding in mock mode."
 
 @app.get("/api/umpires")
 def get_umpires():
